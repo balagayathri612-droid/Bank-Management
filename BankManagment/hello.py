@@ -27,39 +27,68 @@ class Bank:
         random.shuffle(chars)
         return ''.join(chars)
 
+    @staticmethod
+    def _coerce_int(value, field_name):
+        if value is None:
+            raise ValueError(f"{field_name} is required")
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            raise ValueError(f"{field_name} must be a valid integer")
+
     @classmethod
     def create_account(cls, name, age, email, pin):
         data = cls.load_data()
-        if age < 18 or len(str(pin)) != 4:
+        if not name or not email:
+            return None, "Name and email are required"
+        try:
+            age_value = cls._coerce_int(age, "Age")
+            pin_value = cls._coerce_int(pin, "PIN")
+        except ValueError as exc:
+            return None, str(exc)
+
+        if age_value < 18 or len(str(abs(pin_value))) != 4:
             return None, "Age must be 18+ and PIN should be 4 digits"
+
         acc_no = cls.generate_account_number()
         user = {
             "name": name,
-            "age": age,
+            "age": age_value,
             "email": email,
-            "pin": pin,
+            "pin": pin_value,
             "accountNo.": acc_no,
             "balance": 0
         }
         data.append(user)
         cls.save_data(data)
-        return user, "Account created successfully"
+        return user, f"Account created successfully. Your Account Number: {acc_no}"
 
     @classmethod
     def find_user(cls, acc_no, pin):
         data = cls.load_data()
+        try:
+            pin_value = cls._coerce_int(pin, "PIN")
+        except ValueError:
+            return None
+
         for user in data:
-            if user['accountNo.'] == acc_no and user['pin'] == pin:
+            if user['accountNo.'] == acc_no and user['pin'] == pin_value:
                 return user
         return None
 
     @classmethod
     def deposit(cls, acc_no, pin, amount):
         data = cls.load_data()
+        try:
+            pin_value = cls._coerce_int(pin, "PIN")
+            amount_value = cls._coerce_int(amount, "Amount")
+        except ValueError as exc:
+            return False, str(exc)
+
         for user in data:
-            if user['accountNo.'] == acc_no and user['pin'] == pin:
-                if 0 < amount <= 10000:
-                    user['balance'] += amount
+            if user['accountNo.'] == acc_no and user['pin'] == pin_value:
+                if 0 < amount_value <= 10000:
+                    user['balance'] += amount_value
                     cls.save_data(data)
                     return True, "Deposit successful"
                 return False, "Amount must be between 1 and 10000"
@@ -68,10 +97,18 @@ class Bank:
     @classmethod
     def withdraw(cls, acc_no, pin, amount):
         data = cls.load_data()
+        try:
+            pin_value = cls._coerce_int(pin, "PIN")
+            amount_value = cls._coerce_int(amount, "Amount")
+        except ValueError as exc:
+            return False, str(exc)
+
         for user in data:
-            if user['accountNo.'] == acc_no and user['pin'] == pin:
-                if user['balance'] >= amount:
-                    user['balance'] -= amount
+            if user['accountNo.'] == acc_no and user['pin'] == pin_value:
+                if amount_value <= 0:
+                    return False, "Amount must be greater than zero"
+                if user['balance'] >= amount_value:
+                    user['balance'] -= amount_value
                     cls.save_data(data)
                     return True, "Withdrawal successful"
                 return False, "Insufficient balance"
@@ -80,11 +117,25 @@ class Bank:
     @classmethod
     def update_user(cls, acc_no, pin, name=None, email=None, new_pin=None):
         data = cls.load_data()
+        try:
+            pin_value = cls._coerce_int(pin, "PIN")
+        except ValueError as exc:
+            return False, str(exc)
+
         for user in data:
-            if user['accountNo.'] == acc_no and user['pin'] == pin:
+            if user['accountNo.'] == acc_no and user['pin'] == pin_value:
                 user['name'] = name or user['name']
                 user['email'] = email or user['email']
-                user['pin'] = int(new_pin) if new_pin else user['pin']
+
+                if new_pin not in (None, ""):
+                    try:
+                        new_pin_value = cls._coerce_int(new_pin, "New PIN")
+                    except ValueError as exc:
+                        return False, str(exc)
+                    if len(str(abs(new_pin_value))) != 4:
+                        return False, "New PIN should be 4 digits"
+                    user['pin'] = new_pin_value
+
                 cls.save_data(data)
                 return True, "User details updated"
         return False, "User not found"
@@ -92,8 +143,13 @@ class Bank:
     @classmethod
     def delete_user(cls, acc_no, pin):
         data = cls.load_data()
+        try:
+            pin_value = cls._coerce_int(pin, "PIN")
+        except ValueError as exc:
+            return False, str(exc)
+
         for i, user in enumerate(data):
-            if user['accountNo.'] == acc_no and user['pin'] == pin:
+            if user['accountNo.'] == acc_no and user['pin'] == pin_value:
                 data.pop(i)
                 cls.save_data(data)
                 return True, "Account deleted"
